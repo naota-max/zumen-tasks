@@ -489,33 +489,21 @@ export default function App() {
   const handleSave = async (form) => {
     const isNew = !editTask;
     const prevTask = editTask;
-    let mailType = null;
-    let savedTask = form;
     if (isNew) {
-      const { data } = await supabase.from('tasks').insert([taskToRow(form)]).select().single();
-      if (data) { savedTask = rowToTask(data); mailType = "new"; }
+      await supabase.from('tasks').insert([taskToRow(form)]).select().single();
     } else {
       const updatedForm = prevTask.assignee !== form.assignee
         ? { ...form, relayedFrom: prevTask.assignee || "未定" }
         : form;
       await supabase.from('tasks').update(taskToRow(updatedForm)).eq('id', editTask.id);
-      savedTask = updatedForm;
-      if (prevTask.assignee !== form.assignee) mailType = "relay";
-      else if (prevTask.status !== form.status) mailType = "status";
     }
     setShowModal(false); setEditTask(null);
-    if (mailType) setMailConfirm({ task: savedTask, type: mailType });
   };
 
   const openEdit = task => { setEditTask(task); setShowModal(true); };
 
   const handleStatus = async (id, s) => {
-    const task = tasks.find(t=>t.id===id);
     await supabase.from('tasks').update({ status: s }).eq('id', id);
-    if (task && task.status !== s) {
-      const updated = {...task, status:s};
-      setMailConfirm({ task: updated, type: s==="完了"?"complete":"status" });
-    }
   };
 
   const doDelete = async () => {
