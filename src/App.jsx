@@ -43,6 +43,7 @@ function rowToTask(r) {
     memo: r.memo || "",
     archived: r.archived || false,
     relayedFrom: r.relayed_from || "",
+    relayedAt: r.relayed_at || "",
   };
 }
 
@@ -77,9 +78,9 @@ function nowStr() {
   return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
 
-function openMailto({ subject, body, to, bcc }) {
+function openMailto({ subject, body, to }) {
   if (!to) return false;
-  const qs = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${bcc?`&bcc=${encodeURIComponent(bcc)}`:""}`;
+  const qs = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.open(`mailto:${encodeURIComponent(to)}?${qs}`, "_blank");
   return true;
 }
@@ -204,14 +205,15 @@ function SendConfirmModal({ task, type, emails, signature, onClose }) {
   const { subject, body } = buildMail(task, type, signature);
   const allEmailEntries = Object.entries(emails).filter(([,v])=>v&&v.includes("@"));
   const noEmail = allEmailEntries.length === 0;
-  const [selected, setSelected] = useState(() => Object.fromEntries(allEmailEntries.map(([k])=>[k,true])));
+  // デフォルトは全員未選択
+  const [selected, setSelected] = useState(() => Object.fromEntries(allEmailEntries.map(([k])=>[k,false])));
   const [sent, setSent] = useState(false);
   const TYPE_LABELS = { new:"新規作成通知", relay:"引継ぎ依頼", status:"ステータス変更通知", complete:"完了報告" };
   const ta = {padding:"11px 13px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:12,color:"#1e293b",outline:"none",fontFamily:"monospace",background:"#f8fafc",width:"100%",boxSizing:"border-box",resize:"vertical",lineHeight:1.7};
 
   const selectedEmails = allEmailEntries.filter(([k])=>selected[k]).map(([,v])=>v);
-  const to = selectedEmails[0] || "";
-  const bcc = selectedEmails.slice(1).join(",");
+  // 複数選択時はカンマ区切り（BCCなし）
+  const to = selectedEmails.join(",");
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}} onClick={onClose}>
@@ -224,9 +226,9 @@ function SendConfirmModal({ task, type, emails, signature, onClose }) {
           <div style={{background:"#fef2f2",border:"1.5px solid #fecaca",borderRadius:12,padding:"14px 16px",marginBottom:16,fontSize:13,color:"#b91c1c"}}>⚠️ メールアドレスが未登録です。ヘッダーの「📧 メール設定」から登録してください。</div>
         ) : (
           <div style={{marginBottom:14}}>
-            <div style={{fontSize:11,fontWeight:800,color:"#94a3b8",marginBottom:8}}>送信先（チェックして選択）</div>
+            <div style={{fontSize:11,fontWeight:800,color:"#94a3b8",marginBottom:8}}>送信先を選択</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {allEmailEntries.map(([name, email])=>(
+              {allEmailEntries.map(([name])=>(
                 <label key={name} style={{display:"inline-flex",alignItems:"center",gap:6,background:selected[name]?"#eff6ff":"#f8fafc",border:`1.5px solid ${selected[name]?"#3b82f6":"#e2e8f0"}`,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,color:selected[name]?"#1d4ed8":"#64748b",transition:"all 0.15s"}}>
                   <input type="checkbox" checked={!!selected[name]} onChange={e=>setSelected(s=>({...s,[name]:e.target.checked}))} style={{accentColor:"#3b82f6"}} />
                   {name}
@@ -247,7 +249,7 @@ function SendConfirmModal({ task, type, emails, signature, onClose }) {
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,padding:"9px 18px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>閉じる</button>
           {!noEmail && selectedEmails.length>0 && (
-            <button onClick={()=>{openMailto({subject,body,to,bcc});setSent(true);}} style={{background:sent?"#22c55e":"linear-gradient(135deg,#3b82f6,#6366f1)",color:"white",border:"none",borderRadius:10,padding:"9px 22px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit",minWidth:140}}>
+            <button onClick={()=>{openMailto({subject,body,to});setSent(true);}} style={{background:sent?"#22c55e":"linear-gradient(135deg,#3b82f6,#6366f1)",color:"white",border:"none",borderRadius:10,padding:"9px 22px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit",minWidth:140}}>
               {sent?"✓ 起動済み":"📨 メールアプリで開く"}
             </button>
           )}
@@ -316,7 +318,43 @@ function TaskModal({ initial, requesters, assignees, onSave, onClose }) {
   );
 }
 
-function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChange, onMailClick }) {
+// ── 引継ぎ専用モーダル ──
+function RelayModal({ task, assignees, onSave, onClose }) {
+  const [nextAssignee, setNextAssignee] = useState("");
+  const [memo, setMemo] = useState(task.memo||"");
+  const inp = {padding:"9px 12px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:13,color:"#1e293b",outline:"none",fontFamily:"inherit",background:"#f8fafc",width:"100%",boxSizing:"border-box"};
+  const lbl = {fontSize:11,fontWeight:800,color:"#64748b",marginBottom:5,display:"block"};
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}} onClick={onClose}>
+      <div style={{background:"white",borderRadius:20,padding:28,width:"100%",maxWidth:440,boxShadow:"0 24px 80px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
+          <div style={{fontWeight:900,fontSize:17,color:"#0f172a"}}>🔁 引継ぎ依頼</div>
+          <button onClick={onClose} style={{background:"#f1f5f9",border:"none",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:16,color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+        <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#92400e"}}>
+          現在の担当：<strong>{task.assignee||"未定"}</strong>
+        </div>
+        <div style={{marginBottom:14}}>
+          <label style={lbl}>引継ぎ先の担当者 *</label>
+          <select style={inp} value={nextAssignee} onChange={e=>setNextAssignee(e.target.value)}>
+            <option value="">選択してください</option>
+            {assignees.filter(a=>a!==task.assignee).map(a=><option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+        <div style={{marginBottom:20}}>
+          <label style={lbl}>引継ぎメモ（どこまで完了したか等）</label>
+          <textarea style={{...inp,minHeight:80,resize:"vertical"}} value={memo} onChange={e=>setMemo(e.target.value)} placeholder="例：2ページまで完了。残りの修正をお願いします。" />
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <button onClick={onClose} style={{background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,padding:"10px 20px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>キャンセル</button>
+          <button onClick={()=>nextAssignee&&onSave(nextAssignee,memo)} style={{background:nextAssignee?"linear-gradient(135deg,#f97316,#ea580c)":"#cbd5e1",color:"white",border:"none",borderRadius:10,padding:"10px 22px",cursor:nextAssignee?"pointer":"default",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>引継ぎする</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChange, onMailClick, onRelayClick }) {
   const sm = STATUS_META[task.status];
   const pm = PRIORITY_META[task.priority];
   const isOverdue = task.status!=="完了" && task.due && new Date(task.due)<new Date();
@@ -336,7 +374,7 @@ function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChang
       </div>
       {allDescs.length>0 && <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{allDescs.map((d,i)=><Chip key={i} label={d} />)}</div>}
       {task.memo && task.status==="作成・修正中" && <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#92400e",marginBottom:8,lineHeight:1.5}}>📝 {task.memo}</div>}
-      {task.relayedFrom && <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 10px",fontSize:11,color:"#0369a1",marginBottom:8}}>🔁 {task.relayedFrom} から引継ぎ</div>}
+      {task.relayedFrom && <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 10px",fontSize:11,color:"#0369a1",marginBottom:8}}>🔁 {task.relayedFrom} から引継ぎ{task.relayedAt?` （${task.relayedAt}）`:""}</div>}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6,marginBottom:9}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <Avatar name={task.assignee} assignees={assignees} size={24} />
@@ -353,7 +391,7 @@ function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChang
           <button key={s} onClick={e=>{e.stopPropagation();onStatusChange(task.id,s);}} style={{fontSize:11,padding:"3px 10px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontFamily:"inherit",transition:"all 0.15s",background:task.status===s?STATUS_META[s].bg:"#f8fafc",color:task.status===s?STATUS_META[s].text:"#94a3b8",outline:task.status===s?`2px solid ${STATUS_META[s].dot}`:"none"}}>{s}</button>
         ))}
         {task.status==="作成・修正中" && (
-          <button onClick={e=>{e.stopPropagation();onDoubleClick(task);}} style={{marginLeft:"auto",fontSize:11,padding:"3px 11px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontFamily:"inherit",background:"#fff7ed",color:"#ea580c",outline:"1px solid #fed7aa"}} onMouseEnter={e=>e.currentTarget.style.background="#ffedd5"} onMouseLeave={e=>e.currentTarget.style.background="#fff7ed"}>🔁 引継ぎ</button>
+          <button onClick={e=>{e.stopPropagation();onRelayClick(task);}} style={{marginLeft:"auto",fontSize:11,padding:"3px 11px",borderRadius:20,border:"none",cursor:"pointer",fontWeight:700,fontFamily:"inherit",background:"#fff7ed",color:"#ea580c",outline:"1px solid #fed7aa"}} onMouseEnter={e=>e.currentTarget.style.background="#ffedd5"} onMouseLeave={e=>e.currentTarget.style.background="#fff7ed"}>🔁 引継ぎ</button>
         )}
       </div>
     </div>
@@ -374,6 +412,7 @@ export default function App() {
   const [masterModal,       setMasterModal]        = useState(null);
   const [showEmailSettings, setShowEmailSettings]  = useState(false);
   const [pendingMail,       setPendingMail]        = useState(null);
+  const [relayTarget,       setRelayTarget]        = useState(null);
 
   const [tab,    setTab]    = useState("board");
   const [fa,     setFa]     = useState("すべて");
@@ -467,6 +506,20 @@ export default function App() {
 
   const restore = async (id) => {
     await supabase.from('tasks').update({ archived: false }).eq('id', id);
+  };
+
+  const handleRelay = async (nextAssignee, memo) => {
+    if (!relayTarget) return;
+    const now = nowStr();
+    await supabase.from('tasks').update({
+      assignee: nextAssignee,
+      memo: memo,
+      relayed_from: relayTarget.assignee || "未定",
+      relayed_at: now,
+    }).eq('id', relayTarget.id);
+    const updated = {...relayTarget, assignee: nextAssignee, memo, relayedFrom: relayTarget.assignee||"未定"};
+    setPendingMail({ task: updated, type: "relay" });
+    setRelayTarget(null);
   };
 
   const tabBtn = (label, mode, badge) => (
@@ -563,7 +616,7 @@ export default function App() {
               return (
                 <div key={status}>
                   {col.map(t=>(
-                    <TaskCard key={t.id} task={t} assignees={assignees} onDoubleClick={openEdit} onDeleteClick={setDelTarget} onStatusChange={handleStatus} onMailClick={(task,type)=>setPendingMail({task,type})} />
+                    <TaskCard key={t.id} task={t} assignees={assignees} onDoubleClick={openEdit} onDeleteClick={setDelTarget} onStatusChange={handleStatus} onMailClick={(task,type)=>setPendingMail({task,type})} onRelayClick={setRelayTarget} />
                   ))}
                   {col.length===0 && <div style={{textAlign:"center",color:"#cbd5e1",fontSize:12,padding:"20px 0",background:"white",borderRadius:12,border:"1px dashed #e2e8f0"}}>タスクなし</div>}
                   {status==="完了" && col.length>0 && (
@@ -645,6 +698,7 @@ export default function App() {
 
       {showModal         && <TaskModal initial={editTask} requesters={requesters} assignees={assignees} onSave={handleSave} onClose={()=>{setShowModal(false);setEditTask(null);}} />}
       {delTarget         && <DeleteConfirm task={delTarget} onConfirm={doDelete} onCancel={()=>setDelTarget(null)} />}
+      {relayTarget       && <RelayModal task={relayTarget} assignees={assignees} onSave={handleRelay} onClose={()=>setRelayTarget(null)} />}
       {pendingMail       && <SendConfirmModal task={pendingMail.task} type={pendingMail.type} emails={emails} signature={signature} onClose={()=>setPendingMail(null)} />}
       {showEmailSettings && <EmailSettingsModal requesters={requesters} assignees={assignees} emails={emails} signature={signature} onSave={setEmails} onSaveSignature={setSignature} onClose={()=>setShowEmailSettings(false)} />}
       {masterModal==="requester" && <MasterModal title="依頼者" items={requesters} onAdd={v=>setRequesters(r=>[...r,v])} onRemove={v=>setRequesters(r=>r.filter(x=>x!==v))} onClose={()=>setMasterModal(null)} />}
