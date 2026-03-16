@@ -42,6 +42,7 @@ function rowToTask(r) {
     due: r.due || "",
     memo: r.memo || "",
     archived: r.archived || false,
+    relayedFrom: r.relayed_from || "",
   };
 }
 
@@ -58,6 +59,7 @@ function taskToRow(t) {
     due: t.due || null,
     memo: t.memo,
     archived: t.archived,
+    relayed_from: t.relayedFrom || "",
   };
 }
 
@@ -75,13 +77,10 @@ function nowStr() {
   return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
 
-function openMailto({ subject, body, emails }) {
-  const all = Object.values(emails).filter(e => e && e.includes("@"));
-  if (all.length === 0) return false;
-  const to = all[0];
-  const bcc = all.slice(1).join(",");
+function openMailto({ subject, body, to, bcc }) {
+  if (!to) return false;
   const qs = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}${bcc?`&bcc=${encodeURIComponent(bcc)}`:""}`;
-  window.location.href = `mailto:${encodeURIComponent(to)}?${qs}`;
+  window.open(`mailto:${encodeURIComponent(to)}?${qs}`, "_blank");
   return true;
 }
 
@@ -91,7 +90,7 @@ function buildMail(task, type, signature="") {
   const requester = task.requester || "―";
   const due = task.due || "未設定";
   const now = nowStr();
-  const sig = signature ? `\n\n--\n${signature}` : "";
+  const sig = signature ? `\n\n${signature}` : "";  // -- を削除
   if (type === "new") return { subject:`【図面タスク新規】${task.title}`, body:`${assignee} さん\n\n以下のタスクが登録されました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}\n■ ステータス：${task.status}${task.memo?`\n■ メモ：${task.memo}`:""}\n\n登録日時：${now}\n\nよろしくお願いします。${sig}` };
   if (type === "relay") return { subject:`【引継ぎ依頼】${task.title}`, body:`${assignee} さん\n\n以下のタスクの引継ぎをお願いします。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}${task.memo?`\n■ 引継ぎメモ：${task.memo}`:""}\n\n引継ぎ日時：${now}\n\nよろしくお願いします。${sig}` };
   if (type === "status") return { subject:`【ステータス変更】${task.title}`, body:`${assignee} さん\n\n以下のタスクのステータスが変更されました。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 担当者：${assignee}\n■ 依頼者：${requester}\n■ ステータス：${task.status}\n■ 期日：${due}\n\n更新日時：${now}\n\nよろしくお願いします。${sig}` };
@@ -203,11 +202,17 @@ function EmailSettingsModal({ requesters, assignees, emails, signature, onSave, 
 
 function SendConfirmModal({ task, type, emails, signature, onClose }) {
   const { subject, body } = buildMail(task, type, signature);
-  const allEmails = Object.values(emails).filter(e=>e&&e.includes("@"));
-  const noEmail = allEmails.length === 0;
+  const allEmailEntries = Object.entries(emails).filter(([,v])=>v&&v.includes("@"));
+  const noEmail = allEmailEntries.length === 0;
+  const [selected, setSelected] = useState(() => Object.fromEntries(allEmailEntries.map(([k])=>[k,true])));
   const [sent, setSent] = useState(false);
   const TYPE_LABELS = { new:"新規作成通知", relay:"引継ぎ依頼", status:"ステータス変更通知", complete:"完了報告" };
   const ta = {padding:"11px 13px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:12,color:"#1e293b",outline:"none",fontFamily:"monospace",background:"#f8fafc",width:"100%",boxSizing:"border-box",resize:"vertical",lineHeight:1.7};
+
+  const selectedEmails = allEmailEntries.filter(([k])=>selected[k]).map(([,v])=>v);
+  const to = selectedEmails[0] || "";
+  const bcc = selectedEmails.slice(1).join(",");
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}} onClick={onClose}>
       <div style={{background:"white",borderRadius:20,padding:26,width:"100%",maxWidth:520,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 80px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
@@ -218,7 +223,17 @@ function SendConfirmModal({ task, type, emails, signature, onClose }) {
         {noEmail ? (
           <div style={{background:"#fef2f2",border:"1.5px solid #fecaca",borderRadius:12,padding:"14px 16px",marginBottom:16,fontSize:13,color:"#b91c1c"}}>⚠️ メールアドレスが未登録です。ヘッダーの「📧 メール設定」から登録してください。</div>
         ) : (
-          <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:10,padding:"9px 13px",marginBottom:14,fontSize:12,color:"#0369a1"}}>📤 宛先：{allEmails.join("、")}</div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,fontWeight:800,color:"#94a3b8",marginBottom:8}}>送信先（チェックして選択）</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {allEmailEntries.map(([name, email])=>(
+                <label key={name} style={{display:"inline-flex",alignItems:"center",gap:6,background:selected[name]?"#eff6ff":"#f8fafc",border:`1.5px solid ${selected[name]?"#3b82f6":"#e2e8f0"}`,borderRadius:20,padding:"5px 12px",cursor:"pointer",fontSize:12,fontWeight:700,color:selected[name]?"#1d4ed8":"#64748b",transition:"all 0.15s"}}>
+                  <input type="checkbox" checked={!!selected[name]} onChange={e=>setSelected(s=>({...s,[name]:e.target.checked}))} style={{accentColor:"#3b82f6"}} />
+                  {name}
+                </label>
+              ))}
+            </div>
+          </div>
         )}
         <div style={{marginBottom:10}}>
           <div style={{fontSize:11,fontWeight:800,color:"#94a3b8",marginBottom:4}}>件名</div>
@@ -231,7 +246,11 @@ function SendConfirmModal({ task, type, emails, signature, onClose }) {
         {sent && <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"9px 13px",marginBottom:14,fontSize:13,color:"#15803d",fontWeight:700}}>✓ メールアプリが開きました。</div>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,padding:"9px 18px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>閉じる</button>
-          {!noEmail && <button onClick={()=>{openMailto({subject,body,emails});setSent(true);}} style={{background:sent?"#22c55e":"linear-gradient(135deg,#3b82f6,#6366f1)",color:"white",border:"none",borderRadius:10,padding:"9px 22px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit",minWidth:140}}>{sent?"✓ 起動済み":"📨 メールアプリで開く"}</button>}
+          {!noEmail && selectedEmails.length>0 && (
+            <button onClick={()=>{openMailto({subject,body,to,bcc});setSent(true);}} style={{background:sent?"#22c55e":"linear-gradient(135deg,#3b82f6,#6366f1)",color:"white",border:"none",borderRadius:10,padding:"9px 22px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit",minWidth:140}}>
+              {sent?"✓ 起動済み":"📨 メールアプリで開く"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -317,6 +336,7 @@ function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChang
       </div>
       {allDescs.length>0 && <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{allDescs.map((d,i)=><Chip key={i} label={d} />)}</div>}
       {task.memo && task.status==="作成・修正中" && <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#92400e",marginBottom:8,lineHeight:1.5}}>📝 {task.memo}</div>}
+      {task.relayedFrom && <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 10px",fontSize:11,color:"#0369a1",marginBottom:8}}>🔁 {task.relayedFrom} から引継ぎ</div>}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6,marginBottom:9}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
           <Avatar name={task.assignee} assignees={assignees} size={24} />
@@ -415,9 +435,12 @@ export default function App() {
         setPendingMail({ task: newTask, type: "new" });
       }
     } else {
-      await supabase.from('tasks').update(taskToRow(form)).eq('id', editTask.id);
-      if (prevTask.assignee !== form.assignee) setPendingMail({ task: form, type: "relay" });
-      else if (prevTask.status !== form.status) setPendingMail({ task: form, type: "status" });
+      const updatedForm = prevTask.assignee !== form.assignee
+        ? { ...form, relayedFrom: prevTask.assignee || "未定" }
+        : form;
+      await supabase.from('tasks').update(taskToRow(updatedForm)).eq('id', editTask.id);
+      if (prevTask.assignee !== form.assignee) setPendingMail({ task: updatedForm, type: "relay" });
+      else if (prevTask.status !== form.status) setPendingMail({ task: updatedForm, type: "status" });
     }
     setShowModal(false); setEditTask(null);
   };
