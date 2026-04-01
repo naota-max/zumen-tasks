@@ -94,8 +94,8 @@ function buildMail(task, type, signature="") {
   const sig = signature ? `\n\n${signature}` : "";  // -- を削除
   if (type === "new") return { subject:`【図面タスク新規】${task.title}`, body:`${assignee} さん\n\n以下のタスクが登録されました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}\n■ ステータス：${task.status}${task.memo?`\n■ メモ：${task.memo}`:""}\n\n登録日時：${now}\n\nよろしくお願いします。${sig}` };
   if (type === "relay") return { subject:`【引継ぎ依頼】${task.title}`, body:`${assignee} さん\n\n以下のタスクの引継ぎをお願いします。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}${task.memo?`\n■ 引継ぎメモ：${task.memo}`:""}\n\n引継ぎ日時：${now}\n\nよろしくお願いします。${sig}` };
-  if (type === "status") return { subject:`【ステータス変更】${task.title}`, body:`${assignee} さん\n\n以下のタスクのステータスが変更されました。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 担当者：${assignee}\n■ 依頼者：${requester}\n■ ステータス：${task.status}\n■ 期日：${due}\n\n更新日時：${now}\n\nよろしくお願いします。${sig}` };
-  if (type === "complete") return { subject:`【完了報告】${task.title}`, body:`${requester} さん\n\n以下のタスクが完了しました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 担当者：${assignee}\n■ 完了日時：${now}\n\nよろしくお願いします。${sig}` };
+  if (type === "status") return { subject:`【ステータス変更】${task.title}`, body:`${assignee} さん\n\n以下のタスクのステータスが変更されました。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 対応者：${assignee}\n■ 依頼者：${requester}\n■ ステータス：${task.status}\n■ 期日：${due}\n\n更新日時：${now}\n\nよろしくお願いします。${sig}` };
+  if (type === "complete") return { subject:`【完了報告】${task.title}`, body:`${requester} さん\n\n以下のタスクが完了しました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 対応者：${assignee}\n■ 完了日時：${now}\n\nよろしくお願いします。${sig}` };
   return { subject:"", body:"" };
 }
 
@@ -170,7 +170,7 @@ function EmailSettingsModal({ requesters, assignees, emails, signature, onSave, 
         </div>
         <p style={{fontSize:12,color:"#64748b",marginBottom:16,marginTop:0}}>登録したアドレス全員にBCCで一斉送信されます。現在 <strong style={{color:"#3b82f6"}}>{registered}名</strong> 登録済み。</p>
         <div style={{marginBottom:18}}>
-          <div style={{fontSize:11,fontWeight:800,color:"#94a3b8",marginBottom:8}}>担当者</div>
+          <div style={{fontSize:11,fontWeight:800,color:"#94a3b8",marginBottom:8}}>対応者</div>
           {assignees.map(name=>(
             <div key={name} style={{display:"grid",gridTemplateColumns:"80px 1fr",gap:10,alignItems:"center",marginBottom:8}}>
               <div style={{fontWeight:700,fontSize:13,color:"#0f172a"}}>{name}</div>
@@ -189,7 +189,7 @@ function EmailSettingsModal({ requesters, assignees, emails, signature, onSave, 
         </div>
         <div style={{marginBottom:20}}>
           <div style={{fontSize:11,fontWeight:800,color:"#94a3b8",marginBottom:8}}>署名</div>
-          <textarea style={{...inp,minHeight:80,resize:"vertical"}} value={localSig} onChange={e=>setLocalSig(e.target.value)} placeholder={"例：\n株式会社〇〇\n担当：山田太郎\nTEL: 03-XXXX-XXXX"} />
+          <textarea style={{...inp,minHeight:80,resize:"vertical"}} value={localSig} onChange={e=>setLocalSig(e.target.value)} placeholder={"例：\n株式会社〇〇\n対応：山田太郎\nTEL: 03-XXXX-XXXX"} />
           <div style={{fontSize:11,color:"#94a3b8",marginTop:4}}>メール本文の末尾に自動で追加されます</div>
         </div>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
@@ -286,7 +286,7 @@ function TaskModal({ initial, requesters, assignees, onSave, onClose }) {
   const [form, setForm] = useState(initial ? {...initial} : { title:"", descs:[], customDesc:"", requester:"", assignee:"", priority:"中", status:"未着手", due:"", memo:"", archived:false });
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const toggleDesc = d => set("descs", form.descs.includes(d)?form.descs.filter(x=>x!==d):[...form.descs,d]);
-  const canSave = form.title.trim() && (form.descs.length>0||form.customDesc.trim());
+  const canSave = form.title.trim().length > 0;
   const assigneeChanged = isEdit && prevAssignee !== form.assignee;
   const inp = {padding:"9px 12px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:13,color:"#1e293b",outline:"none",fontFamily:"inherit",background:"#f8fafc",width:"100%",boxSizing:"border-box"};
   const lbl = {fontSize:11,fontWeight:800,color:"#64748b",marginBottom:5,display:"block"};
@@ -311,12 +311,12 @@ function TaskModal({ initial, requesters, assignees, onSave, onClose }) {
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
           <div><label style={lbl}>依頼者</label><select style={inp} value={form.requester} onChange={e=>set("requester",e.target.value)}><option value="">―</option>{requesters.map(r=><option key={r}>{r}</option>)}</select></div>
-          <div><label style={lbl}>担当者</label><select style={inp} value={form.assignee} onChange={e=>set("assignee",e.target.value)}><option value="">未定</option>{assignees.map(a=><option key={a}>{a}</option>)}</select></div>
+          <div><label style={lbl}>対応者</label><select style={inp} value={form.assignee} onChange={e=>set("assignee",e.target.value)}><option value="">未定</option>{assignees.map(a=><option key={a}>{a}</option>)}</select></div>
         </div>
         {assigneeChanged && (
           <div style={{background:"#fff7ed",border:"1.5px solid #fed7aa",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#92400e",display:"flex",gap:8,alignItems:"flex-start"}}>
             <span style={{fontSize:16,flexShrink:0}}>🔁</span>
-            <div><div style={{fontWeight:800,marginBottom:2}}>担当者が変わります（引継ぎ）</div><div style={{fontSize:12}}>{prevAssignee||"未定"} → {form.assignee||"未定"}　保存後に引継ぎメールを送れます。</div></div>
+            <div><div style={{fontWeight:800,marginBottom:2}}>対応者が変わります（引継ぎ）</div><div style={{fontSize:12}}>{prevAssignee||"未定"} → {form.assignee||"未定"}　保存後に引継ぎメールを送れます。</div></div>
           </div>
         )}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
@@ -326,7 +326,7 @@ function TaskModal({ initial, requesters, assignees, onSave, onClose }) {
         </div>
         {form.status==="作成・修正中" && (
           <div style={{marginBottom:14}}>
-            <label style={{...lbl,color:assigneeChanged?"#b45309":"#64748b"}}>{assigneeChanged?"🔁 引継ぎメモ（次の担当者へ）":"作業メモ"}</label>
+            <label style={{...lbl,color:assigneeChanged?"#b45309":"#64748b"}}>{assigneeChanged?"🔁 引継ぎメモ（次の対応者へ）":"作業メモ"}</label>
             <textarea style={{...inp,minHeight:72,resize:"vertical"}} value={form.memo} onChange={e=>set("memo",e.target.value)} placeholder="例：2ページまで完了。△△の修正が残っています。" />
           </div>
         )}
@@ -353,10 +353,10 @@ function RelayModal({ task, assignees, onSave, onClose }) {
           <button onClick={onClose} style={{background:"#f1f5f9",border:"none",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:16,color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
         <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#92400e"}}>
-          現在の担当：<strong>{task.assignee||"未定"}</strong>
+          現在の対応：<strong>{task.assignee||"未定"}</strong>
         </div>
         <div style={{marginBottom:14}}>
-          <label style={lbl}>引継ぎ先の担当者 *</label>
+          <label style={lbl}>引継ぎ先の対応者 *</label>
           <select style={inp} value={nextAssignee} onChange={e=>setNextAssignee(e.target.value)}>
             <option value="">選択してください</option>
             {assignees.filter(a=>a!==task.assignee).map(a=><option key={a} value={a}>{a}</option>)}
@@ -599,14 +599,14 @@ export default function App() {
           </div>
           <input style={{...inp,flex:1,minWidth:160}} placeholder="🔍 件名で検索..." value={search} onChange={e=>setSearch(e.target.value)} />
           <button onClick={()=>setMasterModal("requester")} style={{background:"#f8fafc",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 13px",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit"}}>依頼者 ⚙️</button>
-          <button onClick={()=>setMasterModal("assignee")}  style={{background:"#f8fafc",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 13px",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit"}}>担当者 ⚙️</button>
+          <button onClick={()=>setMasterModal("assignee")}  style={{background:"#f8fafc",color:"#64748b",border:"1px solid #e2e8f0",borderRadius:10,padding:"8px 13px",cursor:"pointer",fontWeight:700,fontSize:12,fontFamily:"inherit"}}>対応者 ⚙️</button>
           <button onClick={()=>{setEditTask(null);setShowModal(true);}} style={{background:"linear-gradient(135deg,#3b82f6,#6366f1)",color:"white",border:"none",borderRadius:10,padding:"9px 18px",cursor:"pointer",fontWeight:800,fontSize:13,fontFamily:"inherit"}}>＋ 新規タスク</button>
         </div>
 
         {/* フィルター */}
         {tab!=="archive" && (
           <div style={{display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center"}}>
-            <span style={{fontSize:11,color:"#94a3b8",fontWeight:800}}>担当：</span>{fBtn("すべて",fa,"すべて",setFa)}{assignees.map(a=>fBtn(a,fa,a,setFa))}
+            <span style={{fontSize:11,color:"#94a3b8",fontWeight:800}}>対応：</span>{fBtn("すべて",fa,"すべて",setFa)}{assignees.map(a=>fBtn(a,fa,a,setFa))}
             <span style={{fontSize:11,color:"#94a3b8",fontWeight:800,marginLeft:8}}>優先度：</span>{fBtn("すべて",fp,"すべて",setFp)}{PRIORITIES.map(p=>fBtn(p,fp,p,setFp))}
             <span style={{fontSize:11,color:"#94a3b8",fontWeight:800,marginLeft:8}}>依頼者：</span>{fBtn("すべて",fr,"すべて",setFr)}{requesters.map(r=>fBtn(r,fr,r,setFr))}
           </div>
@@ -646,7 +646,7 @@ export default function App() {
         {tab==="list" && (
           <div style={{background:"white",borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 1px 4px rgba(0,0,0,0.04)"}}>
             <div style={{display:"grid",gridTemplateColumns:"1.6fr 0.9fr 0.7fr 70px 100px 90px 100px",padding:"10px 16px",background:"#f8fafc",borderBottom:"1px solid #e2e8f0",fontSize:11,fontWeight:800,color:"#94a3b8"}}>
-              <span>件名 / 図面種別</span><span>依頼者</span><span>担当</span><span>優先度</span><span>ステータス</span><span>期日</span><span>操作</span>
+              <span>件名 / 図面種別</span><span>依頼者</span><span>対応</span><span>優先度</span><span>ステータス</span><span>期日</span><span>操作</span>
             </div>
             {filtered.length===0 && <div style={{textAlign:"center",padding:40,color:"#cbd5e1",fontSize:13}}>タスクが見つかりません</div>}
             {filtered.map((t,i)=>{
@@ -714,7 +714,7 @@ export default function App() {
       {pendingMail       && <SendConfirmModal task={pendingMail.task} type={pendingMail.type} emails={emails} signature={signature} onClose={()=>setPendingMail(null)} />}
       {showEmailSettings && <EmailSettingsModal requesters={requesters} assignees={assignees} emails={emails} signature={signature} onSave={setEmails} onSaveSignature={setSignature} onClose={()=>setShowEmailSettings(false)} />}
       {masterModal==="requester" && <MasterModal title="依頼者" items={requesters} onAdd={v=>setRequesters(r=>[...r,v])} onRemove={v=>setRequesters(r=>r.filter(x=>x!==v))} onClose={()=>setMasterModal(null)} />}
-      {masterModal==="assignee"  && <MasterModal title="担当者" items={assignees} onAdd={v=>setAssignees(a=>[...a,v])} onRemove={v=>setAssignees(a=>a.filter(x=>x!==v))} onClose={()=>setMasterModal(null)} />}
+      {masterModal==="assignee"  && <MasterModal title="対応者" items={assignees} onAdd={v=>setAssignees(a=>[...a,v])} onRemove={v=>setAssignees(a=>a.filter(x=>x!==v))} onClose={()=>setMasterModal(null)} />}
     </div>
   );
 }
