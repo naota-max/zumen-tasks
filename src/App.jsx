@@ -341,7 +341,7 @@ function TaskModal({ initial, requesters, assignees, onSave, onClose }) {
 
 // ── 引継ぎ専用モーダル ──
 function RelayModal({ task, assignees, onSave, onClose }) {
-  const [nextAssignee, setNextAssignee] = useState("");
+  const [myself, setMyself] = useState("");
   const [memo, setMemo] = useState(task.memo||"");
   const inp = {padding:"9px 12px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:13,color:"#1e293b",outline:"none",fontFamily:"inherit",background:"#f8fafc",width:"100%",boxSizing:"border-box"};
   const lbl = {fontSize:11,fontWeight:800,color:"#64748b",marginBottom:5,display:"block"};
@@ -349,17 +349,17 @@ function RelayModal({ task, assignees, onSave, onClose }) {
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}} onClick={onClose}>
       <div style={{background:"white",borderRadius:20,padding:28,width:"100%",maxWidth:440,boxShadow:"0 24px 80px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
-          <div style={{fontWeight:900,fontSize:17,color:"#0f172a"}}>🔁 引継ぎ依頼</div>
+          <div style={{fontWeight:900,fontSize:17,color:"#0f172a"}}>🔁 引継ぎ</div>
           <button onClick={onClose} style={{background:"#f1f5f9",border:"none",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:16,color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
         <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#92400e"}}>
           現在の対応：<strong>{task.assignee||"未定"}</strong>
         </div>
         <div style={{marginBottom:14}}>
-          <label style={lbl}>引継ぎ先の対応者 *</label>
-          <select style={inp} value={nextAssignee} onChange={e=>setNextAssignee(e.target.value)}>
-            <option value="">選択してください</option>
-            {assignees.filter(a=>a!==task.assignee).map(a=><option key={a} value={a}>{a}</option>)}
+          <label style={lbl}>引き継ぐ人（自分の名前）*</label>
+          <select style={inp} value={myself} onChange={e=>setMyself(e.target.value)}>
+            <option value="">自分の名前を選んでください</option>
+            {assignees.map(a=><option key={a} value={a}>{a}</option>)}
           </select>
         </div>
         <div style={{marginBottom:20}}>
@@ -368,7 +368,7 @@ function RelayModal({ task, assignees, onSave, onClose }) {
         </div>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,padding:"10px 20px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>キャンセル</button>
-          <button onClick={()=>nextAssignee&&onSave(nextAssignee,memo)} style={{background:nextAssignee?"linear-gradient(135deg,#f97316,#ea580c)":"#cbd5e1",color:"white",border:"none",borderRadius:10,padding:"10px 22px",cursor:nextAssignee?"pointer":"default",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>引継ぎする</button>
+          <button onClick={()=>myself&&onSave(myself,memo)} style={{background:myself?"linear-gradient(135deg,#f97316,#ea580c)":"#cbd5e1",color:"white",border:"none",borderRadius:10,padding:"10px 22px",cursor:myself?"pointer":"default",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>私が引き継ぎます</button>
         </div>
       </div>
     </div>
@@ -446,14 +446,20 @@ export default function App() {
   // ── Supabaseからデータ取得 ──
   useEffect(() => {
     fetchTasks();
-    // リアルタイム購読
+    // リアルタイム購読（再接続対応）
     const channel = supabase
       .channel('tasks-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
         fetchTasks();
       })
-      .subscribe();
-    return () => supabase.removeChannel(channel);
+      .subscribe((status) => {
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setTimeout(() => fetchTasks(), 3000);
+        }
+      });
+    // 30秒ごとに自動更新（フォールバック）
+    const interval = setInterval(fetchTasks, 30000);
+    return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, []);
 
   async function fetchTasks() {
