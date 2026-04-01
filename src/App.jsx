@@ -93,7 +93,7 @@ function buildMail(task, type, signature="") {
   const now = nowStr();
   const sig = signature ? `\n\n${signature}` : "";  // -- を削除
   if (type === "new") return { subject:`【図面タスク新規】${task.title}`, body:`${assignee} さん\n\n以下のタスクが登録されました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}\n■ ステータス：${task.status}${task.memo?`\n■ メモ：${task.memo}`:""}\n\n登録日時：${now}\n\nよろしくお願いします。${sig}` };
-  if (type === "relay") return { subject:`【引継ぎ依頼】${task.title}`, body:`${assignee} さん\n\n以下のタスクの引継ぎをお願いします。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}${task.memo?`\n■ 引継ぎメモ：${task.memo}`:""}\n\n引継ぎ日時：${now}\n\nよろしくお願いします。${sig}` };
+  if (type === "relay") return { subject:`【引継ぎ】${task.title}`, body:`お疲れ様です。\n\n本日の作業を引継ぎします。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}\n\n【ここまで完了しました】\n${task.memo||"（記載なし）"}\n\n【ここからお願いします】\n続きの対応をお願いします。\n\n引継ぎ日時：${now}\n引継ぎ元：${task.relayedFrom||task.assignee||"―"}\n\nよろしくお願いします。${sig}` };
   if (type === "status") return { subject:`【ステータス変更】${task.title}`, body:`${assignee} さん\n\n以下のタスクのステータスが変更されました。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 対応者：${assignee}\n■ 依頼者：${requester}\n■ ステータス：${task.status}\n■ 期日：${due}\n\n更新日時：${now}\n\nよろしくお願いします。${sig}` };
   if (type === "complete") return { subject:`【完了報告】${task.title}`, body:`${requester} さん\n\n以下のタスクが完了しました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 対応者：${assignee}\n■ 完了日時：${now}\n\nよろしくお願いします。${sig}` };
   return { subject:"", body:"" };
@@ -363,8 +363,8 @@ function RelayModal({ task, assignees, onSave, onClose }) {
           </select>
         </div>
         <div style={{marginBottom:20}}>
-          <label style={lbl}>引継ぎメモ（どこまで完了したか等）</label>
-          <textarea style={{...inp,minHeight:80,resize:"vertical"}} value={memo} onChange={e=>setMemo(e.target.value)} placeholder="例：2ページまで完了。残りの修正をお願いします。" />
+          <label style={lbl}>ここまで完了しました（メール本文に入ります）</label>
+          <textarea style={{...inp,minHeight:80,resize:"vertical"}} value={memo} onChange={e=>setMemo(e.target.value)} placeholder="例：108号室の白図まで完了。209号室からお願いします。" />
         </div>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <button onClick={onClose} style={{background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,padding:"10px 20px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>キャンセル</button>
