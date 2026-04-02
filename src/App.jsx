@@ -554,13 +554,14 @@ export default function App() {
     const now = nowStr();
     const from = relayTarget.assignee || "未定";
     const newHistory = [...(relayTarget.relayHistory||[]), { from, to: myself, at: now, memo }];
-    await supabase.from('tasks').update({
+    const { error } = await supabase.from('tasks').update({
       assignee: myself,
       memo: memo,
       relayed_from: from,
       relayed_at: now,
-      relay_history: JSON.stringify(newHistory),
+      relay_history: newHistory,
     }).eq('id', relayTarget.id);
+    if (error) console.error('relay error:', error);
     const updated = {...relayTarget, assignee: myself, memo, relayedFrom: from, relayedAt: now, relayHistory: newHistory};
     setPendingMail({ task: updated, type: "relay" });
     setRelayTarget(null);
@@ -571,13 +572,14 @@ export default function App() {
     const now = nowStr();
     const from = relayTarget.assignee || "未定";
     const newHistory = [...(relayTarget.relayHistory||[]), { from, to: myself, at: now, memo, continued: true }];
-    await supabase.from('tasks').update({
+    const { error } = await supabase.from('tasks').update({
       assignee: myself,
       memo: memo,
       relayed_from: from,
       relayed_at: now,
-      relay_history: JSON.stringify(newHistory),
+      relay_history: newHistory,
     }).eq('id', relayTarget.id);
+    if (error) console.error('continue error:', error);
     setRelayTarget(null);
   };
 
