@@ -340,14 +340,14 @@ function TaskModal({ initial, requesters, assignees, onSave, onClose }) {
 }
 
 // ── 引継ぎ専用モーダル ──
-function RelayModal({ task, assignees, onSave, onClose }) {
+function RelayModal({ task, assignees, onRelay, onContinue, onClose }) {
   const [myself, setMyself] = useState("");
   const [memo, setMemo] = useState(task.memo||"");
   const inp = {padding:"9px 12px",borderRadius:10,border:"1.5px solid #e2e8f0",fontSize:13,color:"#1e293b",outline:"none",fontFamily:"inherit",background:"#f8fafc",width:"100%",boxSizing:"border-box"};
   const lbl = {fontSize:11,fontWeight:800,color:"#64748b",marginBottom:5,display:"block"};
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16,backdropFilter:"blur(3px)"}} onClick={onClose}>
-      <div style={{background:"white",borderRadius:20,padding:28,width:"100%",maxWidth:440,boxShadow:"0 24px 80px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:"white",borderRadius:20,padding:28,width:"100%",maxWidth:480,boxShadow:"0 24px 80px rgba(0,0,0,0.2)"}} onClick={e=>e.stopPropagation()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18}}>
           <div style={{fontWeight:900,fontSize:17,color:"#0f172a"}}>🔁 引継ぎ</div>
           <button onClick={onClose} style={{background:"#f1f5f9",border:"none",borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:16,color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
@@ -355,20 +355,30 @@ function RelayModal({ task, assignees, onSave, onClose }) {
         <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#92400e"}}>
           現在の対応：<strong>{task.assignee||"未定"}</strong>
         </div>
+
         <div style={{marginBottom:14}}>
-          <label style={lbl}>引き継ぐ人（自分の名前）*</label>
+          <label style={lbl}>自分の名前 *</label>
           <select style={inp} value={myself} onChange={e=>setMyself(e.target.value)}>
-            <option value="">自分の名前を選んでください</option>
+            <option value="">選択してください</option>
             {assignees.map(a=><option key={a} value={a}>{a}</option>)}
           </select>
         </div>
+
         <div style={{marginBottom:20}}>
           <label style={lbl}>ここまで完了しました（メール本文に入ります）</label>
           <textarea style={{...inp,minHeight:80,resize:"vertical"}} value={memo} onChange={e=>setMemo(e.target.value)} placeholder="例：108号室の白図まで完了。209号室からお願いします。" />
         </div>
-        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
-          <button onClick={onClose} style={{background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,padding:"10px 20px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>キャンセル</button>
-          <button onClick={()=>myself&&onSave(myself,memo)} style={{background:myself?"linear-gradient(135deg,#f97316,#ea580c)":"#cbd5e1",color:"white",border:"none",borderRadius:10,padding:"10px 22px",cursor:myself?"pointer":"default",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>私が引き継ぎます</button>
+
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",flexWrap:"wrap"}}>
+          <button onClick={onClose} style={{background:"#f1f5f9",color:"#475569",border:"none",borderRadius:10,padding:"10px 18px",cursor:"pointer",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>キャンセル</button>
+          <button onClick={()=>myself&&onContinue(myself,memo)}
+            style={{background:myself?"linear-gradient(135deg,#22c55e,#16a34a)":"#cbd5e1",color:"white",border:"none",borderRadius:10,padding:"10px 18px",cursor:myself?"pointer":"default",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>
+            ✅ 引き続き作業します
+          </button>
+          <button onClick={()=>myself&&onRelay(myself,memo)}
+            style={{background:myself?"linear-gradient(135deg,#f97316,#ea580c)":"#cbd5e1",color:"white",border:"none",borderRadius:10,padding:"10px 18px",cursor:myself?"pointer":"default",fontWeight:700,fontSize:13,fontFamily:"inherit"}}>
+            📨 引継ぎをお願いします
+          </button>
         </div>
       </div>
     </div>
@@ -525,17 +535,29 @@ export default function App() {
     await supabase.from('tasks').update({ archived: false }).eq('id', id);
   };
 
-  const handleRelay = async (nextAssignee, memo) => {
+  const handleRelay = async (myself, memo) => {
     if (!relayTarget) return;
     const now = nowStr();
     await supabase.from('tasks').update({
-      assignee: nextAssignee,
+      assignee: myself,
       memo: memo,
       relayed_from: relayTarget.assignee || "未定",
       relayed_at: now,
     }).eq('id', relayTarget.id);
-    const updated = {...relayTarget, assignee: nextAssignee, memo, relayedFrom: relayTarget.assignee||"未定"};
+    const updated = {...relayTarget, assignee: myself, memo, relayedFrom: relayTarget.assignee||"未定"};
     setPendingMail({ task: updated, type: "relay" });
+    setRelayTarget(null);
+  };
+
+  const handleContinue = async (myself, memo) => {
+    if (!relayTarget) return;
+    const now = nowStr();
+    await supabase.from('tasks').update({
+      assignee: myself,
+      memo: memo,
+      relayed_from: relayTarget.assignee || "未定",
+      relayed_at: now,
+    }).eq('id', relayTarget.id);
     setRelayTarget(null);
   };
 
@@ -715,7 +737,7 @@ export default function App() {
 
       {showModal         && <TaskModal initial={editTask} requesters={requesters} assignees={assignees} onSave={handleSave} onClose={()=>{setShowModal(false);setEditTask(null);}} />}
       {delTarget         && <DeleteConfirm task={delTarget} onConfirm={doDelete} onCancel={()=>setDelTarget(null)} />}
-      {relayTarget       && <RelayModal task={relayTarget} assignees={assignees} onSave={handleRelay} onClose={()=>setRelayTarget(null)} />}
+      {relayTarget       && <RelayModal task={relayTarget} assignees={assignees} onRelay={handleRelay} onContinue={handleContinue} onClose={()=>setRelayTarget(null)} />}
       {mailConfirm       && <MailConfirmModal task={mailConfirm.task} type={mailConfirm.type} onSend={()=>{setPendingMail(mailConfirm);setMailConfirm(null);}} onSkip={()=>setMailConfirm(null)} />}
       {pendingMail       && <SendConfirmModal task={pendingMail.task} type={pendingMail.type} emails={emails} signature={signature} onClose={()=>setPendingMail(null)} />}
       {showEmailSettings && <EmailSettingsModal requesters={requesters} assignees={assignees} emails={emails} signature={signature} onSave={setEmails} onSaveSignature={setSignature} onClose={()=>setShowEmailSettings(false)} />}
