@@ -44,7 +44,7 @@ function rowToTask(r) {
     archived: r.archived || false,
     relayedFrom: r.relayed_from || "",
     relayedAt: r.relayed_at || "",
-    relayHistory: r.relay_history || [],
+    relayHistory: typeof r.relay_history === 'string' ? JSON.parse(r.relay_history) : (r.relay_history || []),
   };
 }
 
@@ -95,7 +95,7 @@ function buildMail(task, type, signature="") {
   const now = nowStr();
   const sig = signature ? `\n\n${signature}` : "";  // -- を削除
   if (type === "new") return { subject:`【図面タスク新規】${task.title}`, body:`${assignee} さん\n\n以下のタスクが登録されました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}\n■ ステータス：${task.status}${task.memo?`\n■ メモ：${task.memo}`:""}\n\n登録日時：${now}\n\nよろしくお願いします。${sig}` };
-  if (type === "relay") return { subject:`【引継ぎ】${task.title}`, body:`お疲れ様です。\n\n本日の作業状況をご共有します。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}\n\n【ここまで完了しました】\n${task.memo||"（記載なし）"}\n\n【続きをお願いできる方へ】\n上記の続きからご対応をお願いします。\n\n引継ぎ日時：${now}\n対応者：${assignee}\n\nよろしくお願いします。${sig}` };
+  if (type === "relay") return { subject:`【引継ぎ】${task.title}`, body:`お疲れ様です。\n\n本日の作業状況をご共有します。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 依頼者：${requester}\n■ 優先度：${task.priority}\n■ 期日：${due}\n\n【ここまで完了しました】\n${task.memo||"（記載なし）"}\n\n【続きをお願いできる方へ】\n上記の続きからご対応をお願いします。\n\n対応者：${assignee}\n\nよろしくお願いします。${sig}` };
   if (type === "status") return { subject:`【ステータス変更】${task.title}`, body:`${assignee} さん\n\n以下のタスクのステータスが変更されました。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 対応者：${assignee}\n■ 依頼者：${requester}\n■ ステータス：${task.status}\n■ 期日：${due}\n\n更新日時：${now}\n\nよろしくお願いします。${sig}` };
   if (type === "complete") return { subject:`【完了報告】${task.title}`, body:`${requester} さん\n\n以下のタスクが完了しました。ご確認ください。\n\n■ 件名：${task.title}\n■ 図面種別：${descs}\n■ 対応者：${assignee}\n■ 完了日時：${now}\n\nよろしくお願いします。${sig}` };
   return { subject:"", body:"" };
@@ -559,7 +559,7 @@ export default function App() {
       memo: memo,
       relayed_from: from,
       relayed_at: now,
-      relay_history: newHistory,
+      relay_history: JSON.stringify(newHistory),
     }).eq('id', relayTarget.id);
     const updated = {...relayTarget, assignee: myself, memo, relayedFrom: from, relayedAt: now, relayHistory: newHistory};
     setPendingMail({ task: updated, type: "relay" });
@@ -576,7 +576,7 @@ export default function App() {
       memo: memo,
       relayed_from: from,
       relayed_at: now,
-      relay_history: newHistory,
+      relay_history: JSON.stringify(newHistory),
     }).eq('id', relayTarget.id);
     setRelayTarget(null);
   };
