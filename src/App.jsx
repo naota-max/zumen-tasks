@@ -410,16 +410,24 @@ function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChang
       </div>
       {allDescs.length>0 && <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>{allDescs.map((d,i)=><Chip key={i} label={d} />)}</div>}
       {task.memo && task.status==="作成・修正中" && <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#92400e",marginBottom:8,lineHeight:1.5}}>📝 {task.memo}</div>}
-      {task.relayedFrom && <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 10px",fontSize:11,color:"#0369a1",marginBottom:8}}>🔁 {task.relayedFrom} → {task.assignee||"未定"}{task.relayedAt?` （${task.relayedAt}）`:""}</div>}
+      {task.relayedFrom && <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 10px",fontSize:11,color:"#0369a1",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+        <span>🔁</span>
+        <span style={{fontWeight:800}}>{task.assignee||"未定"}</span>
+        <span style={{color:"#94a3b8"}}>{task.relayedAt}</span>
+        <span style={{fontWeight:700}}>引継ぎます</span>
+      </div>}
       {task.relayHistory && task.relayHistory.length > 0 && (
         <div style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:11,color:"#64748b",marginBottom:8}}>
           <div style={{fontWeight:800,marginBottom:6,color:"#475569"}}>📋 引継ぎ履歴</div>
           {[...task.relayHistory].reverse().map((h,i)=>(
-            <div key={i} style={{background:"white",border:"1px solid #e2e8f0",borderRadius:6,padding:"6px 10px",marginBottom:4,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-              <span style={{fontWeight:800,color:"#0f172a"}}>{h.to}</span>
-              <span style={{color:"#94a3b8"}}>{h.at}</span>
-              <span style={{color:"#0369a1",fontWeight:700}}>引継ぎます</span>
-              {h.memo && <div style={{width:"100%",color:"#64748b",fontSize:11,marginTop:2}}>💬 {h.memo}</div>}
+            <div key={i} style={{background:"white",border:"1px solid #e2e8f0",borderRadius:6,padding:"6px 10px",marginBottom:4,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                <span style={{fontWeight:800,color:"#0f172a"}}>{h.from}</span>
+                <span style={{color:"#94a3b8"}}>→</span>
+                <span style={{fontWeight:800,color:"#0f172a"}}>{h.to}</span>
+                <span style={{marginLeft:"auto",color:"#94a3b8",fontSize:10}}>{h.at}</span>
+              </div>
+              {h.memo && <div style={{color:"#64748b",fontSize:11,marginTop:3}}>💬 {h.memo}</div>}
             </div>
           ))}
         </div>
