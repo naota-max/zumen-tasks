@@ -82,8 +82,9 @@ function nowStr() {
 
 function openMailto({ subject, body, to }) {
   if (!to) return false;
-  const qs = `subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.open(`mailto:${encodeURIComponent(to)}?${qs}`, "_blank");
+  // GmailのURL形式で直接開く
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(gmailUrl, "_blank");
   return true;
 }
 
@@ -411,13 +412,17 @@ function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChang
       {task.memo && task.status==="作成・修正中" && <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:8,padding:"6px 10px",fontSize:12,color:"#92400e",marginBottom:8,lineHeight:1.5}}>📝 {task.memo}</div>}
       {task.relayedFrom && <div style={{background:"#f0f9ff",border:"1px solid #bae6fd",borderRadius:8,padding:"5px 10px",fontSize:11,color:"#0369a1",marginBottom:8}}>🔁 {task.relayedFrom} → {task.assignee||"未定"}{task.relayedAt?` （${task.relayedAt}）`:""}</div>}
       {task.relayHistory && task.relayHistory.length > 0 && (
-        <div style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"6px 10px",fontSize:11,color:"#64748b",marginBottom:8}}>
-          <div style={{fontWeight:700,marginBottom:3}}>引継ぎ履歴</div>
+        <div style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:11,color:"#64748b",marginBottom:8}}>
+          <div style={{fontWeight:800,marginBottom:6,color:"#475569"}}>📋 引継ぎ履歴</div>
           {task.relayHistory.map((h,i)=>(
-            <div key={i} style={{display:"flex",gap:4,alignItems:"center",marginBottom:2}}>
-              <span style={{color:h.continued?"#16a34a":"#ea580c"}}>{h.continued?"✅":"🔁"}</span>
-              <span style={{fontWeight:700}}>{h.from} → {h.to}</span>
-              <span style={{color:"#94a3b8",fontSize:10}}>{h.at}</span>
+            <div key={i} style={{background:"white",border:"1px solid #e2e8f0",borderRadius:6,padding:"6px 10px",marginBottom:4}}>
+              <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                <span style={{fontWeight:800,color:"#0f172a"}}>{h.from}</span>
+                <span style={{color:"#94a3b8"}}>→</span>
+                <span style={{fontWeight:800,color:"#0f172a"}}>{h.to}</span>
+                <span style={{marginLeft:"auto",color:"#94a3b8",fontSize:10}}>{h.at}</span>
+              </div>
+              {h.memo && <div style={{color:"#64748b",fontSize:11,marginTop:2}}>💬 {h.memo}</div>}
             </div>
           ))}
         </div>
