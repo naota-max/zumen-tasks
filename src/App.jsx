@@ -390,6 +390,35 @@ function RelayModal({ task, assignees, onRelay, onContinue, onClose }) {
   );
 }
 
+function RelayHistoryBlock({ history }) {
+  const [expanded, setExpanded] = useState(false);
+  const reversed = [...history].reverse();
+  const shown = expanded ? reversed : reversed.slice(0, 3);
+  const hasMore = reversed.length > 3;
+  return (
+    <div style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:11,color:"#64748b",marginBottom:8}}>
+      <div style={{fontWeight:800,marginBottom:6,color:"#475569"}}>📋 引継ぎ履歴</div>
+      {shown.map((h,i)=>(
+        <div key={i} style={{background:"white",border:"1px solid #e2e8f0",borderRadius:6,padding:"6px 10px",marginBottom:4}}>
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <span style={{fontWeight:800,color:"#0f172a"}}>{h.from}</span>
+            <span style={{color:"#94a3b8"}}>→</span>
+            <span style={{fontWeight:800,color:"#0f172a"}}>{h.to}</span>
+            <span style={{marginLeft:"auto",color:"#94a3b8",fontSize:10}}>{h.at}</span>
+          </div>
+          {h.memo && <div style={{color:"#64748b",fontSize:11,marginTop:3}}>💬 {h.memo}</div>}
+        </div>
+      ))}
+      {hasMore && (
+        <button onClick={e=>{e.stopPropagation();setExpanded(v=>!v);}}
+          style={{width:"100%",background:"#f1f5f9",border:"none",borderRadius:6,padding:"4px 0",cursor:"pointer",fontSize:11,color:"#64748b",fontWeight:700,fontFamily:"inherit",marginTop:2}}>
+          {expanded ? "▲ 閉じる" : `▼ すべて表示（${reversed.length}件）`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChange, onMailClick, onRelayClick }) {
   const sm = STATUS_META[task.status];
   const pm = PRIORITY_META[task.priority];
@@ -417,20 +446,7 @@ function TaskCard({ task, assignees, onDoubleClick, onDeleteClick, onStatusChang
         <span style={{fontWeight:700}}>引継ぎます</span>
       </div>}
       {task.relayHistory && task.relayHistory.length > 0 && (
-        <div style={{background:"#f8fafc",border:"1px solid #e2e8f0",borderRadius:8,padding:"8px 10px",fontSize:11,color:"#64748b",marginBottom:8}}>
-          <div style={{fontWeight:800,marginBottom:6,color:"#475569"}}>📋 引継ぎ履歴</div>
-          {[...task.relayHistory].reverse().map((h,i)=>(
-            <div key={i} style={{background:"white",border:"1px solid #e2e8f0",borderRadius:6,padding:"6px 10px",marginBottom:4,flexWrap:"wrap"}}>
-              <div style={{display:"flex",alignItems:"center",gap:4}}>
-                <span style={{fontWeight:800,color:"#0f172a"}}>{h.from}</span>
-                <span style={{color:"#94a3b8"}}>→</span>
-                <span style={{fontWeight:800,color:"#0f172a"}}>{h.to}</span>
-                <span style={{marginLeft:"auto",color:"#94a3b8",fontSize:10}}>{h.at}</span>
-              </div>
-              {h.memo && <div style={{color:"#64748b",fontSize:11,marginTop:3}}>💬 {h.memo}</div>}
-            </div>
-          ))}
-        </div>
+        <RelayHistoryBlock history={task.relayHistory} />
       )}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:6,marginBottom:9}}>
         <div style={{display:"flex",alignItems:"center",gap:6}}>
