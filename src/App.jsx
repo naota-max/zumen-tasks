@@ -846,7 +846,7 @@ export default function App() {
 
       {showModal         && <TaskModal initial={editTask} requesters={requesters} assignees={assignees} onSave={handleSave} onClose={()=>{setShowModal(false);setEditTask(null);}} />}
       {delTarget         && <DeleteConfirm task={delTarget} onConfirm={doDelete} onCancel={()=>setDelTarget(null)} />}
-      {relayTarget       && <RelayModal task={relayTarget} assignees={assignees} onRelay={handleRelay} onContinue={handleContinue} onClose={()=>setRelayTarget(null)} />}
+      {relayTarget       && <ProgressModal task={relayTarget} assignees={assignees} onRelay={handleRelay} onContinue={handleContinue} onClose={()=>setRelayTarget(null)} />}
       {mailConfirm       && <MailConfirmModal task={mailConfirm.task} type={mailConfirm.type} onSend={()=>{setPendingMail(mailConfirm);setMailConfirm(null);}} onSkip={()=>setMailConfirm(null)} />}
       {pendingMail       && <SendConfirmModal task={pendingMail.task} type={pendingMail.type} emails={emails} signature={signature} onClose={()=>setPendingMail(null)} />}
       {showEmailSettings && <EmailSettingsModal requesters={requesters} assignees={assignees} emails={emails} signature={signature} onSave={setEmails} onSaveSignature={setSignature} onClose={()=>setShowEmailSettings(false)} />}
